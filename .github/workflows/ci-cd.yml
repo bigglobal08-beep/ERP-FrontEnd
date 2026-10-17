@@ -1,0 +1,88 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+
+jobs:
+  # Corre en los runners de GitHub: no consume recursos del servidor.
+  test:
+    name: Lint, tipos y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+      # La URL real la pone cada entorno al construir en el servidor; aquí solo se valida que compile.
+      - name: Validar que la imagen Docker compila
+        run: docker build --build-arg NEXT_PUBLIC_API_URL=https://api-staging.giadministracion.com -t erp-front-ci .
+
+  # Push a staging -> entorno staging. Push a main -> entorno production.
+  # Solo si lo anterior pasó. Corre en el runner self-hosted del servidor.
+  # Mismo esquema que el backend: una carpeta por entorno con su .env adentro.
+  #   production: ~/Documents/ERP-FrontEnd          staging: ~/Documents/staging/ERP-FrontEnd
+  deploy:
+    name: Deploy (${{ github.ref_name == 'main' && 'production' || 'staging' }})
+    needs: test
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'staging')
+    runs-on: [self-hosted, linux]
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    # Nunca dos deploys del mismo entorno a la vez; si llega otro push, espera a que termine el actual.
+    concurrency:
+      group: erp-front-deploy-${{ github.ref_name }}
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      DEPLOY_SUBDIR: ${{ github.ref_name == 'main' && 'Documents/ERP-FrontEnd' || 'Documents/staging/ERP-FrontEnd' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verificar carpeta y .env del entorno
+        run: |
+          DEPLOY_DIR="$HOME/$DEPLOY_SUBDIR"
+          echo "DEPLOY_DIR=$DEPLOY_DIR" >> "$GITHUB_ENV"
+          test -f "$DEPLOY_DIR/.env" || { echo "Falta $DEPLOY_DIR/.env en el servidor"; exit 1; }
+          # Evita que un .env copiado del otro entorno despliegue encima de él.
+          grep -qx "COMPOSE_PROJECT_NAME=erp-front-$DEPLOY_ENV" "$DEPLOY_DIR/.env" || {
+            echo "$DEPLOY_DIR/.env debe tener la línea COMPOSE_PROJECT_NAME=erp-front-$DEPLOY_ENV"; exit 1; }
+          # NEXT_PUBLIC_API_URL se fija al compilar: sin ella el navegador no sabría a qué API llamar.
+          grep -q "^NEXT_PUBLIC_API_URL=https://" "$DEPLOY_DIR/.env" || {
+            echo "$DEPLOY_DIR/.env debe tener NEXT_PUBLIC_API_URL=https://..."; exit 1; }
+          command -v rsync > /dev/null || { echo "Instala rsync en el servidor: sudo apt install rsync"; exit 1; }
+          docker network inspect gama-net > /dev/null
+
+      # Copia el código a la carpeta del entorno. --delete quita archivos que ya no existen en el repo,
+      # pero nunca toca el .env.
+      - name: Actualizar código en la carpeta del entorno
+        run: rsync -a --delete --exclude=.git/ --exclude=.env --exclude=logs/ ./ "$DEPLOY_DIR/"
+
+      # Construye la imagen con las NEXT_PUBLIC_* del .env de ESTE entorno y recrea solo su contenedor.
+      # PM2, el otro entorno y los demás proyectos no se ven afectados.
+      # --wait espera a que el healthcheck pase; si no, el job falla.
+      - name: Construir y levantar
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Estado
+        if: always() && env.DEPLOY_DIR != ''
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: docker compose ps
+
+      - name: Logs si falló
+        if: failure() && env.DEPLOY_DIR != ''
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: docker compose logs --tail 100 frontend
+
+      - name: Limpiar imágenes viejas
+        run: docker image prune -f

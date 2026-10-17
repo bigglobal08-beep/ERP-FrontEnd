@@ -1,0 +1,42 @@
+# Prefijo único: contenedor y red quedan como erp-front-*, aislados de otros proyectos.
+# En el servidor, el .env lo cambia a erp-front-staging / erp-front-production (COMPOSE_PROJECT_NAME),
+# así ambos entornos conviven con contenedores separados.
+name: erp-front
+
+# El puerto y el alias se cambian desde .env para correr staging y producción en la misma máquina.
+# Los valores por defecto son los de producción / desarrollo.
+# El backend se consume SOLO por su URL pública (NEXT_PUBLIC_API_URL), tanto desde el navegador como desde SSR.
+
+services:
+  frontend:
+    build:
+      context: .
+      # Se fijan dentro del JavaScript al compilar: cada entorno construye su propia imagen con su .env.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Define NEXT_PUBLIC_API_URL en .env}
+    restart: unless-stopped
+    env_file: .env
+    # Estas variables sobrescriben las de .env.
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    # host:contenedor. Solo localhost: el acceso externo entra por Cloudflare Tunnel.
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-4200}:3000"
+    networks:
+      gama-net:
+        # Nombre con el que otros contenedores encuentran al frontend dentro de gama-net.
+        aliases:
+          - ${FRONTEND_ALIAS:-erp-frontend}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  # Red compartida entre proyectos. Se crea una vez por máquina: docker network create gama-net
+  gama-net:
+    external: true

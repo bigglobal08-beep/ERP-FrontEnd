@@ -1,0 +1,16 @@
+# Lo que NO se envía a Docker al construir la imagen.
+node_modules
+.next
+out
+build
+coverage
+.git
+.github
+.env
+.env.*
+*.log
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+docker-compose.yml
+README.md
