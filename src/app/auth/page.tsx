@@ -1,3 +1,6 @@
+import Button from "@/components/form/Button";
+import FieldText from "@/components/form/FieldText";
+import FormGrid from "@/components/form/FormGrid";
 import { Montserrat } from "next/font/google";
 
 const montserrat = Montserrat({
@@ -15,21 +18,24 @@ export default function LoginPage() {
       </header>
       <section className="flex-1 flex flex-col p-6">
         <form className="w-full mx-auto bg-white rounded-lg p-4">
-          <div className="grid gap-1">
-            <label htmlFor="email" className="font-semibold text-sm">
-              Correo
-            </label>
-            <input
-              className="border border-slate-300 rounded-md p-1"
-              type="email"
+          <FormGrid>
+            <FieldText
               name="email"
-              id="email"
-              autoComplete="off"
+              type="email"
+              label="Correo"
+              placeholder="Coloca tu correo para iniciar sesión..."
             />
-          </div>
+            <FieldText
+              type="password"
+              name="password"
+              label="Contraseña"
+              placeholder="Escribe tu contraseña..."
+            />
+            <Button>Iniciar sesión</Button>
+          </FormGrid>
         </form>
       </section>
-      <footer className="h-50 bg-white">footer</footer>
+      <footer className="h-30 bg-white">footer</footer>
     </main>
   );
 }
