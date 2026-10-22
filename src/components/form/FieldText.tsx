@@ -1,3 +1,5 @@
+"use client";
+
 import type { InputHTMLAttributes } from "react";
 import { useId } from "react";
 
@@ -29,7 +31,7 @@ export default function FieldText({
       {label && (
         <label
           htmlFor={inputId}
-          className="text-sm font-semibold text-slate-700"
+          className="text-sm font-semibold text-slate-700 text-[16px]"
         >
           {label}
         </label>
@@ -43,7 +45,7 @@ export default function FieldText({
         autoComplete="off"
         className={`
           w-full rounded-lg border border-slate-300
-          bg-white px-3 py-1.5
+          bg-white px-3 py-3
           text-sm text-slate-800
           placeholder:text-slate-400
 
