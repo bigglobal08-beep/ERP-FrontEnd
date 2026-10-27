@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import MainTopNav from "@/components/ui/MainTopNav";
+import ModalProvider from "@/components/ui/modal/ModalProvider";
 
 export const metadata: Metadata = {
   title: "ERP GI Administración",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             {children}
           </main>
         </div>
+        <ModalProvider />
       </body>
     </html>
   );
