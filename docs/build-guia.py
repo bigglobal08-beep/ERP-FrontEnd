@@ -81,9 +81,9 @@ def note(text, kind="info"):
 COMMON = [
     ("name", "FieldPath<T>", "Nombre del campo en el form (obligatorio). Con el genérico <code>&lt;FormInput&gt;</code> TypeScript lo autocompleta."),
     ("label", "string", "Etiqueta del campo."),
-    ("hint", "string", "Texto de ayuda bajo el control; se reemplaza por el error cuando lo hay."),
+    ("hint", "string", "Texto de ayuda bajo el control. Con <code>errorMode=\"inline\"</code> se reemplaza por el error cuando lo hay."),
     ("direction", '"col" | "row"', "<code>col</code> (defecto): label arriba. <code>row</code>: label a la izquierda si el campo mide ≥ 24rem."),
-    ("onChange", "(value, form) => void", "Se ejecuta cuando el <b>usuario</b> cambia el valor (como <code>@api.onchange</code>). Ver sección 15."),
+    ("onChange", "(value, form) => void", "Se ejecuta cuando el <b>usuario</b> cambia el valor (como <code>@api.onchange</code>). Ver la sección «Onchange»."),
     ("disabled", "boolean", "Deshabilita el campo."),
     ("rules", "RegisterOptions", "Reglas de RHF. Solo para forms sin esquema Zod."),
 ]
@@ -93,7 +93,7 @@ COMMON = [
 sections = []
 
 sections.append(section(
-    "form", "1. useZodForm + FormLayout",
+    "form", "useZodForm + FormLayout",
     "Todo formulario se arma con <b>useZodForm</b> (useForm + validación Zod) y <b>FormLayout</b>, que provee el contexto a los Fields, "
     "maneja el envío y avisa si el usuario intenta salir con cambios sin guardar (estilo Odoo).",
     [
@@ -101,6 +101,8 @@ sections.append(section(
         ("onSubmit", "(values) => void | Promise", "Recibe los valores ya validados y transformados por el esquema. Si lanza error, el form sigue “con cambios”."),
         ("onInvalid", "(errors) => void", "Opcional. Se llama cuando la validación falla."),
         ("guardUnsaved", "boolean", "Aviso de cambios sin guardar al salir. <b>true</b> por defecto."),
+        ("errorMode", '"toast" | "inline"', "<code>toast</code> (defecto): los errores de validación se muestran en toasts y el campo solo queda en rojo. "
+         "<code>inline</code>: el mensaje va debajo de cada campo."),
         ("className / …", "props de <form>", "Cualquier prop nativa del form. Por defecto <code>flex flex-col gap-2</code>."),
     ],
     [
@@ -141,7 +143,7 @@ export default function ClienteForm() {
   );
 }
 """),
-        ("Edición con datos de la API", "Los <code>defaultValues</code> son el punto “sin cambios”. Aquí se desactiva el aviso de salida y se usa <code>onInvalid</code>.", """
+        ("Edición con datos de la API", "Los <code>defaultValues</code> son el punto “sin cambios”. Aquí se desactiva el aviso de salida y los errores se muestran bajo cada campo.", """
 export default function EditarCliente({ cliente }: { cliente: Cliente }) {
   const methods = useZodForm(schema, {
     defaultValues: { name: cliente.name, email: cliente.email },
@@ -151,8 +153,8 @@ export default function EditarCliente({ cliente }: { cliente: Cliente }) {
     <FormLayout
       methods={methods}
       onSubmit={(values) => api.updateCliente(cliente.id, values)}
-      onInvalid={() => modalWarning("Revisa los campos marcados en rojo.")}
       guardUnsaved={false}   // p. ej. en un filtro de búsqueda
+      errorMode="inline"     // mensajes bajo cada campo en lugar de toasts
       className="grid grid-cols-2 gap-4"
     >
       <FieldText<FormInput> name="name" label="Nombre" direction="row" />
@@ -163,13 +165,66 @@ export default function EditarCliente({ cliente }: { cliente: Cliente }) {
 }
 """),
     ],
-    extra=note("<b>Al guardar con éxito</b> el formulario vuelve a quedar “sin cambios”. El diálogo de salida ofrece "
+    extra=note("<b>Errores de validación:</b> por defecto se muestran en toasts (react-hot-toast). Al salir de un campo inválido aparece un toast solo para ese campo, que se cierra al corregirlo; al enviar con errores aparece un único toast con el resumen. El <code>&lt;AppToaster /&gt;</code> ya está montado en el layout raíz; puedes lanzar tus propios toasts con <code>import toast from \"react-hot-toast\"</code>.") + note("<b>Al guardar con éxito</b> el formulario vuelve a quedar “sin cambios”. El diálogo de salida ofrece "
                "<i>Seguir editando</i>, <i>Descartar cambios</i> y <i>Guardar y salir</i>. Cubre enlaces, botón atrás/adelante, "
                "recarga y cierre de pestaña; no bloquea <code>router.push()</code> llamado desde código."),
 ))
 
 sections.append(section(
-    "comunes", "2. Props comunes de todos los Fields",
+    "group", "FormGroup y FormCol — acomodar Fields en columnas",
+    "<b>FormGroup</b> es un contenedor en grid para los Fields (como <code>&lt;group&gt;</code> de Odoo). Las columnas se "
+    "definen por tamaño de pantalla; cada Field ocupa una columna y <b>FormCol</b> hace que ocupe varias (como "
+    "<code>colspan</code>). Los dos se importan de <code>@/components/ui/form/FormGroup</code>.",
+    [
+        ("xs", "1–12", "Columnas base (móvil en adelante). <b>1</b> por defecto."),
+        ("sm / md / lg / xl", "1–12", "Columnas desde 640 / 768 / 1024 / 1280 px."),
+        ("title / description", "string", "Solo FormGroup. Encabezado opcional con línea divisoria."),
+        ("className", "string", "Clases extra del contenedor."),
+        ("FormCol xs…xl", "1–12", "Columnas que ocupa su contenido en cada tamaño."),
+    ],
+    [
+        ("Datos de un cliente en 4 columnas", "1 columna en móvil, 2 en tablet y 4 en escritorio; la dirección ocupa todo el ancho.", """
+import FormGroup, { FormCol } from "@/components/ui/form/FormGroup";
+
+<FormLayout methods={methods} onSubmit={onSubmit}>
+  <FormGroup title="Datos generales" description="Información fiscal del cliente" xs={1} sm={2} lg={4}>
+    <FieldText<FormInput> name="name" label="Nombre" />
+    <FieldText<FormInput> name="rfc" label="RFC" />
+    <FieldText<FormInput> name="email" label="Correo" />
+    <FieldText<FormInput> name="phone" label="Teléfono" />
+    <FormCol sm={2} lg={4}>
+      <FieldText<FormInput> name="address" label="Dirección" />
+    </FormCol>
+  </FormGroup>
+</FormLayout>
+"""),
+        ("Varios grupos en un formulario", "Cada grupo define sus columnas; un FormCol puede ocupar distinto ancho según el tamaño.", """
+<FormLayout methods={methods} onSubmit={onSubmit} className="flex flex-col gap-6">
+  <FormGroup title="Crédito" xs={1} md={3}>
+    <FieldNumber<FormInput> name="limit" label="Límite" widget="monetary" />
+    <FieldNumber<FormInput> name="days" label="Días de crédito" widget="integer" />
+    <FieldSelect<FormInput> name="priceListId" label="Lista de precios" options={listas} />
+    <FormCol md={3}>
+      <FieldTextarea<FormInput> name="notes" label="Notas" />
+    </FormCol>
+  </FormGroup>
+
+  <FormGroup title="Entrega" xs={2} lg={6}>
+    <FormCol xs={2} lg={4}>
+      <FieldText<FormInput> name="street" label="Calle y número" />
+    </FormCol>
+    <FieldText<FormInput> name="zip" label="C.P." />
+    <FieldText<FormInput> name="city" label="Ciudad" />
+  </FormGroup>
+</FormLayout>
+"""),
+    ],
+    extra=note("Las columnas responden al <b>ancho de la pantalla</b> (breakpoints de Tailwind). Dentro de un modal o panel "
+               "angosto usa menos columnas en <code>lg</code>/<code>xl</code>, o deja solo <code>xs</code>."),
+))
+
+sections.append(section(
+    "comunes","Props comunes de todos los Fields",
     "Todos los Fields comparten estas props, además de las propias de cada uno. El valor, el error y el estado los toman del "
     "<code>FormLayout</code>, así que no se pasa <code>value</code>; <code>onChange</code> es opcional y solo sirve para "
     "reaccionar al cambio (el valor se guarda solo).",
@@ -187,7 +242,7 @@ sections.append(section(
 ))
 
 sections.append(section(
-    "text", "3. FieldText",
+    "text", "FieldText",
     "Input de texto de daisyUI. Acepta cualquier prop nativa de <code>&lt;input&gt;</code> (<code>type</code>, <code>placeholder</code>, <code>maxLength</code>…).",
     [("type", "string", "<code>text</code> por defecto; también <code>email</code>, <code>password</code>, <code>tel</code>, etc.")],
     [
@@ -206,7 +261,7 @@ rfc: z.string().trim().toUpperCase().regex(/^[A-ZÑ&]{3,4}\\d{6}[A-Z\\d]{3}$/, "
 ))
 
 sections.append(section(
-    "textarea", "4. FieldTextarea",
+    "textarea", "FieldTextarea",
     "Textarea simple o, con <code>widget=\"html\"</code>, un editor enriquecido (Tiptap) con títulos, listas, tablas, alertas de daisyUI, "
     "imágenes y atajos tipo Markdown (<code>##</code>, <code>**negrita**</code>, <code>-</code>, <code>&gt;</code>). El editor solo se descarga donde se usa.",
     [
@@ -238,7 +293,7 @@ sections.append(section(
 ))
 
 sections.append(section(
-    "number", "5. FieldNumber",
+    "number", "FieldNumber",
     "Guarda siempre un <code>number</code> (nunca string). Al escribir muestra el número sin formato; al salir lo formatea "
     "(<code>$1,000.00</code>). Limita decimales <b>sin redondear</b>, alinea a la derecha y arranca en 0.",
     [
@@ -264,7 +319,7 @@ qty: z.number().int().min(1, "Mínimo 1 pieza"),
 ))
 
 sections.append(section(
-    "select", "6. FieldSelect",
+    "select", "FieldSelect",
     "Select nativo de daisyUI. Guarda el valor original de la opción (respeta <code>number</code>) o <code>null</code> sin selección. "
     "El tipo <code>SelectOption</code> se comparte con FieldRadio y FieldChoice.",
     [
@@ -298,7 +353,7 @@ const options: SelectOption[] = almacenes.map((a) => ({
 ))
 
 sections.append(section(
-    "boolean", "7. FieldBoolean",
+    "boolean", "FieldBoolean",
     "Checkbox o toggle que guarda <code>true</code>/<code>false</code>.",
     [("variant", '"checkbox" | "toggle"', "<code>checkbox</code> por defecto."), ("label", "string", "Obligatorio. En <code>row</code> va en la columna del label.")],
     [
@@ -313,7 +368,7 @@ sections.append(section(
 ))
 
 sections.append(section(
-    "radio", "8. FieldRadio",
+    "radio", "FieldRadio",
     "Una opción de varias. Variante de círculos clásicos o grupo de botones (segmented).",
     [
         ("options", "SelectOption[]", "Mismas opciones que FieldSelect."),
@@ -344,7 +399,7 @@ sections.append(section(
 ))
 
 sections.append(section(
-    "choice", "9. FieldChoice",
+    "choice", "FieldChoice",
     "Varias opciones a la vez. Guarda un arreglo con los valores en el orden de la lista (no en el de los clics). Arranca en <code>[]</code>.",
     [
         ("options", "SelectOption[]", "Mismas opciones que FieldSelect."),
@@ -378,7 +433,7 @@ sections.append(section(
 ))
 
 sections.append(section(
-    "date", "10. FieldDate",
+    "date", "FieldDate",
     "Calendario de daisyUI (react-day-picker) en español. Guarda strings ISO, no objetos <code>Date</code>, para evitar desfases de zona horaria.",
     [
         ("mode", '"single" | "range"', "<code>single</code> → <code>\"2026-10-27\"</code>. <code>range</code> → <code>{ from, to }</code>."),
@@ -409,7 +464,7 @@ period: z.object(
 ))
 
 sections.append(section(
-    "image", "11. FieldImage",
+    "image", "FieldImage",
     "Recuadro para elegir o arrastrar una imagen, con vista previa y botón para quitarla. Guarda un <code>File</code> nuevo, "
     "un <code>string</code> (URL actual al editar) o <code>null</code>.",
     [
@@ -437,7 +492,7 @@ const methods = useZodForm(schema, { defaultValues: { photo: producto.photoUrl }
 ))
 
 sections.append(section(
-    "file", "12. FieldFile",
+    "file", "FieldFile",
     "Zona para elegir o arrastrar un archivo. Muestra una tarjeta con ícono, nombre y tamaño; los PDF e imágenes se pueden "
     "ver en un modal (visor del navegador), los demás se descargan.",
     [("accept", "string", "PDF, imágenes, <code>.xlsx</code>, <code>.xls</code> y <code>.csv</code> por defecto.")],
@@ -463,7 +518,7 @@ contract: z.union([
 ))
 
 sections.append(section(
-    "formdata", "13. toFormData — enviar archivos",
+    "formdata", "toFormData — enviar archivos",
     "Convierte los valores del form a <code>FormData</code> (multipart). Archivos tal cual; arreglos simples como una entrada por "
     "elemento; objetos como JSON; <code>null</code> se omite. No pongas <code>Content-Type</code>: el navegador agrega el boundary.",
     [],
@@ -486,7 +541,7 @@ await fetch(`/api/clientes/${id}`, {
 ))
 
 sections.append(section(
-    "modals", "14. Modales globales",
+    "modals", "Modales globales",
     "Funciones globales que se pueden llamar desde cualquier parte, incluso fuera de React (helpers de fetch, interceptores). "
     "<code>&lt;ModalProvider /&gt;</code> ya está montado en el layout raíz. Si se piden varios a la vez, se muestran en cola. "
     "También existe <code>useModal()</code>, que devuelve las mismas funciones.",
@@ -533,7 +588,7 @@ try { await api.changePassword(data); } finally { close(); }
 ))
 
 sections.append(section(
-    "onchange", "15. Onchange — reaccionar a cambios",
+    "onchange", "Onchange — reaccionar a cambios",
     "El equivalente a <code>@api.onchange</code> de Odoo. Hay dos formas y ambas se disparan <b>solo cuando el usuario cambia "
     "el valor</b>: los cambios hechos con <code>form.setValue()</code> (incluidos los del propio onchange) no las vuelven a "
     "disparar, así que un onchange puede actualizar otros campos sin entrar en bucle.",
@@ -593,6 +648,11 @@ useOnChange(methods, ["qty", "price", "discount"], (values, { form }) => {
 
 # ---------------------------------------------------------------- documento
 
+# Numera las secciones en el orden en que aparecen (así se pueden insertar sin renumerar a mano)
+sections = [
+    s.replace("<h2>", f"<h2>{i}. ", 1) for i, s in enumerate(sections, start=1)
+]
+
 toc = "".join(
     f'<li><a href="#{m.group(1)}">{m.group(2)}</a></li>'
     for m in (re.search(r'<section id="(\w+)"><h2>(.*?)</h2>', s) for s in sections)
@@ -651,7 +711,7 @@ cover = f"""
     <p class="files meta" style="margin-top:14px">
       Archivos: <code>src/components/ui/form/</code> (FormLayout y Fields) · <code>src/components/ui/modal/</code> ·
       <code>src/hooks/useZodForm.ts</code> · <code>src/lib/toFormData.ts</code><br>
-      Versión del 27 de octubre de 2026
+      Versión del 29 de octubre de 2026
     </p>
   </div>
 </div>

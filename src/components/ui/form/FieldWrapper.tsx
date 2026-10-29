@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { useErrorMode } from "./errorMode";
 
 // col: label arriba del control | row: label a la izquierda y control a la derecha
 export type FieldDirection = "row" | "col";
@@ -19,13 +20,15 @@ export default function FieldWrapper({
   children,
 }: FieldWrapperProps) {
   const labelId = useId();
+  const errorMode = useErrorMode();
   const isRow = direction === "row";
 
   return (
     // El label es un <div> y no <legend> porque el legend no participa en el grid del fieldset
     <fieldset
       aria-labelledby={label ? labelId : undefined}
-      className="fieldset @container"
+      // min-w-0: el fieldset por defecto no se encoge por debajo de su contenido y se desborda en grids
+      className="fieldset @container min-w-0"
     >
       {/* row: 2 columnas solo si el propio campo mide ≥ 24rem (container query);
           en contenedores angostos (móvil, modales, paneles) queda en vertical */}
@@ -46,7 +49,8 @@ export default function FieldWrapper({
         )}
         <div className="grid min-w-0 gap-1.5">
           {children}
-          {error ? (
+          {/* En modo toast el mensaje va en el toast; el campo solo conserva su borde rojo */}
+          {error && errorMode === "inline" ? (
             <p className="label text-error">{error}</p>
           ) : (
             hint && <p className="label">{hint}</p>

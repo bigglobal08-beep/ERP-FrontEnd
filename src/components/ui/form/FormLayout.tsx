@@ -17,6 +17,8 @@ import {
   type UseFormReturn,
 } from "react-hook-form";
 import useUnsavedChangesGuard from "@/hooks/useUnsavedChangesGuard";
+import { ErrorModeContext, type ErrorMode } from "./errorMode";
+import useErrorToasts from "./useErrorToasts";
 
 type FormLayoutProps<
   TFieldValues extends FieldValues,
@@ -29,6 +31,8 @@ type FormLayoutProps<
   onInvalid?: SubmitErrorHandler<TFieldValues>;
   // Avisa antes de salir de la página si hay cambios sin guardar (activo por defecto)
   guardUnsaved?: boolean;
+  // toast (defecto): los errores de validación se muestran en toasts | inline: debajo de cada campo
+  errorMode?: ErrorMode;
   children: ReactNode;
 };
 
@@ -40,6 +44,7 @@ export default function FormLayout<
   onSubmit,
   onInvalid,
   guardUnsaved = true,
+  errorMode = "toast",
   children,
   className = "flex flex-col gap-2",
   ...props
@@ -61,6 +66,8 @@ export default function FormLayout<
   useUnsavedChangesGuard(guardUnsaved && hasChanges, (proceed) =>
     setPendingLeave(() => proceed),
   );
+
+  useErrorToasts(methods.control, errorMode === "toast");
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -91,9 +98,11 @@ export default function FormLayout<
 
   return (
     <FormProvider {...methods}>
-      <form noValidate className={className} onSubmit={submit()} {...props}>
-        {children}
-      </form>
+      <ErrorModeContext value={errorMode}>
+        <form noValidate className={className} onSubmit={submit()} {...props}>
+          {children}
+        </form>
+      </ErrorModeContext>
 
       {/* Fuera del <form> para no anidar elementos de formulario */}
       <dialog
