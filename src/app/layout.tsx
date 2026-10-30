@@ -14,9 +14,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" data-theme="corporate" suppressHydrationWarning>
       <body>
         <div className="h-screen flex flex-col overflow-hidden">
-          <main className="flex-1 flex flex-col min-h-0 w-min-0 rounded">
+          <div className="flex-1 flex flex-col min-h-0 w-min-0 rounded">
             {children}
-          </main>
+          </div>
         </div>
         <ModalProvider />
         <AppToaster />

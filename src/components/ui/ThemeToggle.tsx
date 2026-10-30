@@ -4,10 +4,10 @@ import { Moon, Sun } from "lucide-react";
 import { useState } from "react";
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<"corporate" | "business">("corporate");
+  const [theme, setTheme] = useState<"corporate" | "dracula">("corporate");
 
   const toggleTheme = () => {
-    const nextTheme = theme === "corporate" ? "business" : "corporate";
+    const nextTheme = theme === "corporate" ? "dracula" : "corporate";
 
     document.documentElement.setAttribute("data-theme", nextTheme);
 
