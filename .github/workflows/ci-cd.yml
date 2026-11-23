@@ -23,6 +23,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api-staging.giadministracion.com
 
       # La URL real la pone cada entorno al construir en el servidor; aquí solo se valida que compile.
       - name: Validar que la imagen Docker compila

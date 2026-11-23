@@ -31,20 +31,21 @@ export async function apiRequest<T>(
   path: string,
   { body, query, auth = true }: RequestOptions = {},
 ): Promise<ApiResponse<T>> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // Va antes de validar la URL: leer cookies evita que el build prerenderice datos de sesión
+  if (auth) {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (!token) redirect("/auth");
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const baseUrl = process.env.NEXT_PUBLIC_API_URL;
   if (!baseUrl) throw new ApiError(500, "La API no está configurada.");
 
   const url = new URL(path, baseUrl);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== "") url.searchParams.set(key, String(value));
-  }
-
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (auth) {
-    const token = (await cookies()).get(SESSION_COOKIE)?.value;
-    if (!token) redirect("/auth");
-    headers.Authorization = `Bearer ${token}`;
   }
 
   let response: Response;
