@@ -1,6 +1,6 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
+import { X } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -26,7 +26,7 @@ type FormLayoutProps<
 > = Omit<ComponentProps<"form">, "onSubmit" | "children"> & {
   methods: UseFormReturn<TFieldValues, unknown, TTransformedValues>;
   // Con resolver recibe los valores ya validados/transformados por el esquema.
-  // Si lanza un error, el form sigue marcado con cambios sin guardar
+  // Si regresa false (no se guardó), el form sigue marcado con cambios sin guardar
   onSubmit: SubmitHandler<TTransformedValues>;
   onInvalid?: SubmitErrorHandler<TFieldValues>;
   // Avisa antes de salir de la página si hay cambios sin guardar (activo por defecto)
@@ -79,7 +79,12 @@ export default function FormLayout<
   const submit = (afterSave?: () => void) =>
     methods.handleSubmit(
       async (values) => {
-        await onSubmit(values);
+        const result = await onSubmit(values);
+        if (result === false) {
+          // Cierra el diálogo de salida para que el usuario vea el error
+          setPendingLeave(null);
+          return;
+        }
         methods.reset(methods.getValues());
         afterSave?.();
       },
@@ -112,26 +117,22 @@ export default function FormLayout<
         onClose={() => setPendingLeave(null)}
       >
         <div className="modal-box max-w-md">
-          <div className="flex items-start gap-3">
-            <div className="bg-warning/15 text-warning rounded-full p-2">
-              <TriangleAlert className="size-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold">Cambios sin guardar</h3>
-              <p className="text-base-content/70 mt-1 text-sm">
-                Este formulario tiene cambios que no se han guardado. ¿Qué
-                quieres hacer antes de salir?
-              </p>
-            </div>
-          </div>
+          {/* Primer elemento enfocable: un Enter accidental no descarta los cambios */}
+          <button
+            type="button"
+            aria-label="Cerrar"
+            className="btn btn-ghost btn-xs btn-square absolute top-3 right-3"
+            onClick={() => setPendingLeave(null)}
+          >
+            <X className="size-4" />
+          </button>
+          <h3 className="pr-6 text-lg font-semibold">
+            ¿Desea salir sin guardar los cambios?
+          </h3>
+          <p className="text-base-content/70 mt-1 text-sm">
+            Advertencia: al salir se perderán los cambios.
+          </p>
           <div className="modal-action flex-wrap">
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setPendingLeave(null)}
-            >
-              Seguir editando
-            </button>
             <button
               type="button"
               className="btn btn-error btn-outline btn-sm"
@@ -140,16 +141,23 @@ export default function FormLayout<
                 leave();
               }}
             >
-              Descartar cambios
+              Salir sin guardar
             </button>
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary btn-outline btn-sm"
               disabled={isSubmitting}
               onClick={() => submit(leave)()}
             >
               {isSubmitting && <span className="loading loading-spinner loading-xs" />}
               Guardar y salir
+            </button>
+            <button
+              type="button"
+              className="btn btn-neutral btn-sm"
+              onClick={() => setPendingLeave(null)}
+            >
+              Cancelar
             </button>
           </div>
         </div>

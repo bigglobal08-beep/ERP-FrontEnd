@@ -13,11 +13,20 @@ export type ModalOptions = {
   danger?: boolean;
 };
 
+export type ModalPromptConfig = {
+  label?: string;
+  inputType?: "text" | "password";
+  minLength?: number;
+  maxLength?: number;
+};
+
 export type ModalRequest = ModalOptions & {
   id: number;
   variant: ModalVariant;
   message: string;
-  resolve: (confirmed: boolean) => void;
+  // Si existe, el modal pide un dato antes de confirmar
+  prompt?: ModalPromptConfig;
+  resolve: (confirmed: boolean, value?: string) => void;
 };
 
 export type LoadingRequest = { id: number; message?: string };
@@ -50,11 +59,11 @@ const emptyState: ModalState = { queue: [], loadings: [] };
 export const getServerSnapshot = () => emptyState;
 
 // Cierra el modal actual y resuelve su promesa
-export function resolveModal(id: number, confirmed: boolean) {
+export function resolveModal(id: number, confirmed: boolean, value?: string) {
   const modal = state.queue.find((m) => m.id === id);
   if (!modal) return;
   setState({ ...state, queue: state.queue.filter((m) => m.id !== id) });
-  modal.resolve(confirmed);
+  modal.resolve(confirmed, value);
 }
 
 // --- API pública ---
@@ -96,6 +105,28 @@ export const modalError = (error: unknown, options?: ModalOptions) =>
 export const modalConfirm = (message: string, options?: ModalOptions) =>
   open("confirm", message, options);
 
+/** Confirmación que pide un dato (motivo, contraseña). Regresa el texto o null si cancela. */
+export const modalPrompt = (
+  message: string,
+  { label, inputType, minLength, maxLength, ...options }: ModalOptions & ModalPromptConfig = {},
+) =>
+  new Promise<string | null>((resolve) => {
+    setState({
+      ...state,
+      queue: [
+        ...state.queue,
+        {
+          ...options,
+          id: nextId++,
+          variant: "confirm",
+          message,
+          prompt: { label, inputType, minLength, maxLength },
+          resolve: (confirmed, value) => resolve(confirmed ? (value ?? "") : null),
+        },
+      ],
+    });
+  });
+
 /**
  * Pantalla de carga que bloquea la interacción. Devuelve la función para cerrarla.
  * Admite varias a la vez: el overlay sigue visible hasta que se cierran todas.
@@ -126,6 +157,7 @@ export const modal = {
   warning: modalWarning,
   error: modalError,
   confirm: modalConfirm,
+  prompt: modalPrompt,
   loading: alertLoading,
   withLoading,
 };

@@ -6,14 +6,16 @@ import {
   CircleX,
   Info,
   TriangleAlert,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   getServerSnapshot,
   getSnapshot,
   resolveModal,
   subscribe,
+  type ModalRequest,
   type ModalVariant,
 } from "./modal";
 
@@ -70,6 +72,55 @@ function useDialog(open: boolean) {
   return ref;
 }
 
+// Campo y botones de modalPrompt(); el botón se habilita al cumplir la longitud mínima
+function PromptForm({ request }: { request: ModalRequest }) {
+  const [value, setValue] = useState("");
+  const { label, inputType = "text", minLength = 1, maxLength } = request.prompt ?? {};
+  const isPassword = inputType === "password";
+  const clean = isPassword ? value : value.trim();
+  const isValid = clean.length >= minLength;
+
+  return (
+    <form
+      method="dialog"
+      className="mt-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (isValid) resolveModal(request.id, true, clean);
+      }}
+    >
+      <label className="fieldset">
+        {label && <span className="fieldset-legend">{label}</span>}
+        <input
+          type={inputType}
+          value={value}
+          maxLength={maxLength}
+          autoComplete={isPassword ? "new-password" : "off"}
+          onChange={(e) => setValue(e.target.value)}
+          className="input w-full"
+        />
+        <span className="label">Mínimo {minLength} caracteres</span>
+      </label>
+      <div className="modal-action flex-wrap">
+        <button
+          type="submit"
+          disabled={!isValid}
+          className={`btn btn-outline btn-sm ${request.danger ? "btn-error" : "btn-primary"}`}
+        >
+          {request.confirmText ?? "Confirmar"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-neutral btn-sm"
+          onClick={() => resolveModal(request.id, false)}
+        >
+          {request.cancelText ?? "Cancelar"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** Se monta una sola vez en el layout raíz; dibuja los modales pedidos con modalAlert(), etc. */
 export default function ModalProvider() {
   const { queue, loadings } = useSyncExternalStore(
@@ -87,6 +138,21 @@ export default function ModalProvider() {
   const variant = current ? variants[current.variant] : null;
   const Icon = variant?.icon;
   const isConfirm = current?.variant === "confirm";
+  const confirmClass = current?.danger
+    ? "btn-outline btn-error"
+    : isConfirm
+      ? "btn-outline btn-primary"
+      : variant?.buttonClass;
+  const closeButton = current && (
+    <button
+      type="button"
+      aria-label="Cerrar"
+      className="btn btn-ghost btn-xs btn-square absolute top-3 right-3"
+      onClick={() => resolveModal(current.id, false)}
+    >
+      <X className="size-4" />
+    </button>
+  );
 
   return (
     <>
@@ -126,39 +192,50 @@ export default function ModalProvider() {
         )}
         {current && variant && Icon && current.variant !== "success" && (
           <div key={current.id} className="modal-box max-w-md">
+            {/* showModal() enfoca lo primero: en confirm es la X, así un Enter accidental
+                no ejecuta la acción. En prompt va al final para enfocar el campo */}
+            {isConfirm && !current.prompt && closeButton}
             <div className="flex items-start gap-3">
-              <div className={`shrink-0 rounded-full p-2 ${variant.iconClass}`}>
-                <Icon className="size-5" />
-              </div>
-              <div className="min-w-0">
+              {!isConfirm && (
+                <div className={`shrink-0 rounded-full p-2 ${variant.iconClass}`}>
+                  <Icon className="size-5" />
+                </div>
+              )}
+              <div className={`min-w-0 ${isConfirm ? "pr-6" : ""}`}>
+                {/* Sin título, la pregunta de la confirmación se vuelve el título */}
                 <h3 id="app-modal-title" className="text-lg font-semibold">
-                  {current.title ?? variant.title}
+                  {current.title ?? (isConfirm ? current.message : variant.title)}
                 </h3>
-                <p className="text-base-content/70 mt-1 text-sm break-words whitespace-pre-line">
-                  {current.message}
-                </p>
+                {(!isConfirm || current.title) && (
+                  <p className="text-base-content/70 mt-1 text-sm break-words whitespace-pre-line">
+                    {current.message}
+                  </p>
+                )}
               </div>
             </div>
-            <div className="modal-action">
-              {isConfirm && (
+            {current.prompt ? (
+              <PromptForm request={current} />
+            ) : (
+              <div className="modal-action flex-wrap">
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => resolveModal(current.id, false)}
+                  className={`btn btn-sm ${confirmClass}`}
+                  onClick={() => resolveModal(current.id, true)}
                 >
-                  {current.cancelText ?? "Cancelar"}
+                  {current.confirmText ?? (isConfirm ? "Confirmar" : "Aceptar")}
                 </button>
-              )}
-              {/* showModal() enfoca el primer botón: en confirm es "Cancelar", así un Enter
-                  accidental no ejecuta la acción */}
-              <button
-                type="button"
-                className={`btn btn-sm ${current.danger ? "btn-error" : variant.buttonClass}`}
-                onClick={() => resolveModal(current.id, true)}
-              >
-                {current.confirmText ?? (isConfirm ? "Confirmar" : "Aceptar")}
-              </button>
-            </div>
+                {isConfirm && (
+                  <button
+                    type="button"
+                    className="btn btn-neutral btn-sm"
+                    onClick={() => resolveModal(current.id, false)}
+                  >
+                    {current.cancelText ?? "Cancelar"}
+                  </button>
+                )}
+              </div>
+            )}
+            {current.prompt && closeButton}
           </div>
         )}
         {/* Clic afuera: cierra los avisos; en confirm no, para evitar cancelar por accidente */}

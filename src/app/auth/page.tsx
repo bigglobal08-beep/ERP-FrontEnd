@@ -1,6 +1,7 @@
 import LoginForm from "@/components/login/LoginForm";
 import GradientBackground from "@/components/ui/GradientBackground";
 import { Montserrat } from "next/font/google";
+import { Suspense } from "react";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -19,7 +20,10 @@ export default function PageLogin() {
       </h1>
       <div className="mx-auto w-full max-w-sm bg-white p-4 rounded-lg mt-9 shadow-md">
         <div className="p-4 border border-slate-200 rounded-md">
-          <LoginForm />
+          {/* LoginForm lee searchParams para el aviso de sesión expirada */}
+          <Suspense>
+            <LoginForm />
+          </Suspense>
         </div>
       </div>
     </GradientBackground>
