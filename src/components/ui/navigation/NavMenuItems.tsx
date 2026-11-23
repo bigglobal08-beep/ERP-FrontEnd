@@ -14,11 +14,14 @@ function NavNode({ item }: { item: IMenuItem }) {
     return (
       <li>
         <details>
-          <summary className="font-semibold">
+          <summary
+            title={item.span}
+            className="font-semibold in-data-[collapsed=true]:justify-center in-data-[collapsed=true]:after:hidden"
+          >
             {icon}
-            <span className="min-w-0 break-words">{item.span}</span>
+            <span className="min-w-0 break-words in-data-[collapsed=true]:hidden">{item.span}</span>
           </summary>
-          <ul>
+          <ul className="in-data-[collapsed=true]:hidden">
             {item.children.map((child, index) => (
               <NavNode key={child.id ?? `${child.span}-${index}`} item={child} />
             ))}
@@ -31,9 +34,9 @@ function NavNode({ item }: { item: IMenuItem }) {
   if (!isInternal(item.href)) {
     return (
       <li className="menu-disabled">
-        <span className="font-semibold">
+        <span title={item.span} className="font-semibold in-data-[collapsed=true]:justify-center">
           {icon}
-          {item.span}
+          <span className="min-w-0 break-words in-data-[collapsed=true]:hidden">{item.span}</span>
         </span>
       </li>
     );

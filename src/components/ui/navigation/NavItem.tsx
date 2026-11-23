@@ -17,9 +17,14 @@ export function NavItem({ label, icon, route = "#" }: NavItemProps) {
 
   return (
     <li>
-      <Link href={route} className={`font-semibold ${isActive ? "menu-active" : ""}`}>
+      {/* title: con el menú contraído es el único texto visible del enlace */}
+      <Link
+        href={route}
+        title={label}
+        className={`font-semibold in-data-[collapsed=true]:justify-center ${isActive ? "menu-active" : ""}`}
+      >
         {icon}
-        <span className="min-w-0 break-words">{label}</span>
+        <span className="min-w-0 break-words in-data-[collapsed=true]:hidden">{label}</span>
       </Link>
     </li>
   );
